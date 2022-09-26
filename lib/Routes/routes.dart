@@ -6,6 +6,7 @@ import '../View/Screens/Home_Screen/home_screen.dart';
 import '../View/Screens/Login_Screen/login_screen.dart';
 import '../View/Screens/Main_Page/main_page.dart';
 import '../View/Screens/Register_Screen/register_screen.dart';
+import '../View/Screens/Search_Screen/search_screen.dart';
 import '../View/Screens/Splash_Screen/splash_screen.dart';
 
 class AppRoutes {
@@ -15,6 +16,7 @@ class AppRoutes {
   static const homeScreen = Routes.homeScreen;
   static const registerScreen = Routes.registerScreen;
   static const mainScreen = Routes.mainScreen;
+  static const searchScreen = Routes.searchScreen;
 
   //getPages
   static final routes = [
@@ -46,6 +48,11 @@ class AppRoutes {
       page: () => RegisterScreen(),
       binding: AuthBinding(),
     ),
+    GetPage(
+      name: Routes.searchScreen,
+      page: () => SearchScreen(),
+      binding: AuthBinding(),
+    ),
 
   ];
 }
@@ -56,5 +63,6 @@ class Routes {
   static const registerScreen = '/registerScreen';
   static const homeScreen = '/homeScreen';
   static const mainScreen = '/mainScreen';
+  static const searchScreen = '/searchScreen';
 
 }

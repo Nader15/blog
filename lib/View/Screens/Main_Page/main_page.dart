@@ -21,7 +21,7 @@ class MainPage extends StatelessWidget {
           items:const [
              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Feed'),
             BottomNavigationBarItem(
-                icon: Icon(Icons.file_upload_outlined), label: 'Post'),
+                icon: Icon(Icons.file_upload_outlined), label: 'Upload'),
             BottomNavigationBarItem(
                 icon: Icon(Icons.person), label: 'Profile'),
             // BottomNavigationBarItem(

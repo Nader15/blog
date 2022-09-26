@@ -1,12 +1,18 @@
+import 'dart:io';
+
 import 'package:blog/Routes/routes.dart';
 import 'package:blog/Utils/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
+import 'package:firebase_database/firebase_database.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../Models/user_model.dart';
 
 class AuthController extends GetxController {
@@ -15,15 +21,23 @@ class AuthController extends GetxController {
   var displayUserName = ''.obs;
   var displayUserPhoto = ''.obs;
   var displayUserEmail = ''.obs;
+  var tags = ''.obs;
+  var categoryFilter = ''.obs;
+
   User? get userProfile => auth.currentUser;
+  var searchKey = ''.obs;
+  var blogTextController = TextEditingController().obs;
+  var blogCategoryController = TextEditingController().obs;
+  final referenceDatabase = FirebaseDatabase.instance;
+  var ref = FirebaseDatabase.instance.ref('Blogs');
 
   @override
   onInit() {
     super.onInit();
-
     if (userProfile != null) {
-      displayUserPhoto.value = userProfile!.photoURL??"https://th.bing.com/th/id/R.88f4f67fe36423a9f099e32757f61acc?rik=CLtRO2eGANx4Vw&riu=http%3a%2f%2fcdn.onlinewebfonts.com%2fsvg%2fimg_329115.png&ehk=mXoK%2be700RIpbejgADkfZYJSnzVqJhHHmQWdguPy40k%3d&risl=&pid=ImgRaw&r=0";
-      displayUserName.value =  userProfile!.displayName?? "";
+      displayUserPhoto.value = userProfile!.photoURL ??
+          "https://th.bing.com/th/id/R.88f4f67fe36423a9f099e32757f61acc?rik=CLtRO2eGANx4Vw&riu=http%3a%2f%2fcdn.onlinewebfonts.com%2fsvg%2fimg_329115.png&ehk=mXoK%2be700RIpbejgADkfZYJSnzVqJhHHmQWdguPy40k%3d&risl=&pid=ImgRaw&r=0";
+      displayUserName.value = userProfile!.displayName ?? "";
       displayUserEmail.value = userProfile!.email ?? "";
     }
   }
@@ -37,13 +51,13 @@ class AuthController extends GetxController {
     try {
       await auth
           .createUserWithEmailAndPassword(email: email, password: password)
-          .then((value) async{
-       await userProfile!.updateDisplayName(name);
+          .then((value) async {
+        await userProfile!.updateDisplayName(name);
         userCreate(
           uId: value.user!.uid,
           name: name,
           email: email,
-          image: value.user!.photoURL??"",
+          image: value.user!.photoURL ?? "",
         );
       });
       update();
@@ -75,7 +89,7 @@ class AuthController extends GetxController {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    }finally{
+    } finally {
       isLoading(false);
     }
   }
@@ -86,8 +100,7 @@ class AuthController extends GetxController {
   }) async {
     isLoading(true);
     try {
-      await auth
-          .signInWithEmailAndPassword(email: email, password: password);
+      await auth.signInWithEmailAndPassword(email: email, password: password);
 
       update();
       Get.offAllNamed(Routes.mainScreen);
@@ -97,7 +110,7 @@ class AuthController extends GetxController {
 
       if (error.code == 'user-not-found') {
         message =
-        ' Account does not exists for that $email.. Create your account by signing up..';
+            ' Account does not exists for that $email.. Create your account by signing up..';
       } else if (error.code == 'wrong-password') {
         message = ' Invalid Password... PLease try again! ';
       } else {
@@ -118,7 +131,7 @@ class AuthController extends GetxController {
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
-    }finally{
+    } finally {
       isLoading(false);
     }
   }
@@ -132,7 +145,7 @@ class AuthController extends GetxController {
       displayUserPhoto.value = googleUser.photoUrl ?? "";
       displayUserEmail.value = googleUser.email;
       GoogleSignInAuthentication googleSignInAuthentication =
-      await googleUser.authentication;
+          await googleUser.authentication;
       final AuthCredential authCredential = GoogleAuthProvider.credential(
         idToken: googleSignInAuthentication.idToken,
         accessToken: googleSignInAuthentication.accessToken,
@@ -153,9 +166,7 @@ class AuthController extends GetxController {
     }
   }
 
-
-
-  void logOut() async{
+  void logOut() async {
     await auth.signOut();
     await googleSignIn.signOut();
     Get.offAllNamed(Routes.splashScreen);
@@ -166,22 +177,21 @@ class AuthController extends GetxController {
     required String name,
     required String email,
     required String image,
-
   }) {
     UsersModel usersModel = UsersModel(
-        uId: uId,
-        name: name,
-        email: email,
-        image: '',
+      uId: uId,
+      name: name,
+      email: email,
+      image: '',
     );
     FirebaseFirestore.instance
         .collection("users")
         .doc(uId)
         .set(
-      usersModel.toMap(),
-    )
-        .then((value) {
-    }).catchError((error) {
+          usersModel.toMap(),
+        )
+        .then((value) {})
+        .catchError((error) {
       Get.snackbar(
         'FireStore!',
         error.toString(),
@@ -190,6 +200,52 @@ class AuthController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     });
+  }
+
+
+  uploadPostImage()async{
+    FirebaseStorage storage = FirebaseStorage.instance;
+    final reference =
+    storage.ref().child("profileImages/${auth.currentUser!.uid}");
+
+    //Upload the file to firebase
+    UploadTask uploadTask = reference.putFile(postImage.value!);
+
+    // Waits till the file is uploaded then stores the download url
+    var imageUrl = await (await uploadTask).ref.getDownloadURL();
+    print(imageUrl);
+
+  }
+
+
+
+  Future getPostImage() async {
+    final imageFile = await _picker.pickImage(source: ImageSource.gallery);
+    if (imageFile != null) {
+      postImage.value = File(imageFile.path);
+    } else {
+      print('No Image Selected');
+    }
+  }
+
+  Rx<File?> postImage = File("").obs;
+  Rx<File?> imageFile = File("").obs;
+  final ImagePicker _picker = ImagePicker();
+
+  void getImage() async {
+    XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    croppedImage(pickedFile!.path);
+  }
+
+  void croppedImage(filePath) async {
+    CroppedFile? croppedImage = await ImageCropper().cropImage(
+      sourcePath: filePath,
+      maxHeight: 1080,
+      maxWidth: 1080,
+    );
+    if (croppedImage != null) {
+      imageFile.value = File(croppedImage.path);
+    }
   }
 
 }
